@@ -42,18 +42,26 @@ TEMPLATES = [
         "path": "templates/mobilize.png",
         "zone": (0.80, 0.80, 0.99, 0.99),
         "threshold": 0.85
-    }  
+    },
+    {
+        "name": "enter_episode",
+        "path": "templates/enter_episode.png",
+        "zone": (0.36, 0.63, 0.63, 0.78),
+        "threshold": 0.85
+    }    
 ]
 
 
 # [NEW] automenu detection
 AUTOMENU_TEMPLATE = {
+    "name": "automenu",
     "path": "templates/automenu.png",
     "zone": (0.68, 0.01, 0.99, 0.14),
     "threshold": 0.85
 }
 
 REWARD_TEMPLATE = {
+        "name": "reward",
         "path": "templates/reward.png",
         "zone": (0.23, 0.14, 0.72, 0.28),
         "threshold": 0.85,
@@ -171,8 +179,8 @@ class AutoClicker(threading.Thread):
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Image AutoClicker")
-        self.geometry("450x450")
+        self.title("Auto Blue Archive")
+        self.geometry("450x600")
         ctk.set_appearance_mode("system")
         ctk.set_default_color_theme("blue")
 
