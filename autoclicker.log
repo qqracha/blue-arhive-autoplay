@@ -1,0 +1,41 @@
+2025-10-13 20:57:52 [INFO] > Start button pressed
+2025-10-13 20:57:52 [INFO] > Restart button pressed
+2025-10-13 20:57:53 [INFO] > Stop button pressed
+2025-10-13 20:57:55 [INFO] > Start button pressed
+2025-10-13 20:57:55 [INFO] > Restart button pressed
+2025-10-13 20:57:59 [INFO] > Stop button pressed
+2025-10-13 21:01:04 [INFO] [MATCH] Found 'enter_episode' at (962, 775) — clicked.
+2025-10-13 21:01:04 [ERROR] Unhandled exception in listener callback
+Traceback (most recent call last):
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/_util/__init__.py", line 230, in inner
+    return f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/_util/xorg.py", line 472, in _handler
+    self._handle_message(self._display_stop, event, injected)
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/keyboard/_xorg.py", line 578, in _handle_message
+    self.on_press(key, injected)
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/_util/__init__.py", line 146, in inner
+    if f(*args) is False:
+       ^^^^^^^^
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/keyboard/__init__.py", line 237, in _on_press
+    hotkey.press(self.canonical(key))
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/venv/lib/python3.12/site-packages/pynput/keyboard/__init__.py", line 194, in press
+    self._on_activate()
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/main.py", line 261, in start_clicker
+    self.worker = AutoClicker(TEMPLATES, self.delay_var.get(), on_update=self.update_status)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/qqracha/Documents/Github/blue-arhive-autoplay/main.py", line 144, in __init__
+    self.on_update(self.click_counts, time.time() - self.start_time)
+                                      ~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+TypeError: unsupported operand type(s) for -: 'float' and 'NoneType'
+2025-10-13 21:03:34 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:03:37 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:03:48 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:03:56 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:04:04 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:04:12 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:05:16 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:06:25 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:06:39 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:06:42 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER
+2025-10-13 21:07:11 [INFO] [AutoMenu] Found automenu.png — pressing ESC then ENTER

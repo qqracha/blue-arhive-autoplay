@@ -1,5 +1,3 @@
-import os
-import sys
 import time
 import threading
 from pathlib import Path
@@ -9,6 +7,18 @@ import pyautogui
 import customtkinter as ctk
 from pynput import keyboard
 import mss
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1" # delete pygame trash in console
+import pygame
+
+# ----------------------------- sound -------------------------------------
+pygame.mixer.init()
+SOUND_PATH = "resources/whistle.wav"
+if Path(SOUND_PATH).exists():
+    start_sound = pygame.mixer.Sound(SOUND_PATH)
+else:
+    start_sound = None
+    print(f"[Warning] Звуковой файл {SOUND_PATH} не найден, звук отключен.")
 
 # ----------------------------- configuration -----------------------------
 
@@ -179,7 +189,7 @@ class AutoClicker(threading.Thread):
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auto Blue Archive")
+        self.title("オートブルーアーカイブ | Auto Blue Archive")
         self.geometry("450x600")
         ctk.set_appearance_mode("system")
         ctk.set_default_color_theme("blue")
@@ -231,6 +241,8 @@ class App(ctk.CTk):
             return
         self.worker = AutoClicker(TEMPLATES, self.delay_var.get(), on_update=self.update_status)
         self.worker.start()
+        if start_sound:
+            start_sound.play()
         print("> Start button pressed")
 
     def restart_clicker(self):
@@ -238,7 +250,6 @@ class App(ctk.CTk):
         for var in self.count_vars.values():
             var.set("0")
         self.time_var.set("0.0 s")
-        self.start_clicker()
         print("> Restart button pressed")
 
     def stop_clicker(self):
