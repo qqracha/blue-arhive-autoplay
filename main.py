@@ -1,29 +1,34 @@
+import os
+import sys
 import time
 import threading
+import subprocess
+import tempfile
+from pathlib import Path
+import shutil
+
 import cv2
 import numpy as np
 import pyautogui
-from pathlib import Path
 import customtkinter as ctk
-from PIL import Image
 from pynput import keyboard
+import mss
 
 # ----------------------------- configuration -----------------------------
 
-# define templates: image path, search area (%), similarity threshold
 TEMPLATES = [
     {
         "name": "confirm_button",
         "path": "templates/confirm.png",
-        "zone": (0.77, 0.84, 0.99, 0.99),  # x1, y1, x2, y2 (as % of screen)
+        "zone": (0.77, 0.84, 0.99, 0.99),
         "threshold": 0.85
     },
-    #{
-    #     "name": "ok_button",
-    #     "path": "templates/ok.png",
-    #     "zone": (0.45, 0.40, 0.55, 0.50),
-    #     "threshold": 0.85
-    # },
+    {
+        "name": "watch_button",
+        "path": "templates/watch.png",
+        "zone": (0.48, 0.65, 0.73, 0.80),
+        "threshold": 0.85
+    },
     # {
     #     "name": "reward_button",
     #     "path": "templates/reward.png",
@@ -32,16 +37,15 @@ TEMPLATES = [
     # },
 ]
 
-# delay between scans
-DEFAULT_DELAY = 1.0
+DEFAULT_DELAY = 1.0  # seconds
 
-# ----------------------------- utils -----------------------------
+# ----------------------------- utilities -----------------------------
 
 def load_template(path):
-    """load image as cv2 bgr array"""
+    """load image as cv2 BGR array"""
     img = cv2.imread(str(path))
     if img is None:
-        raise FileNotFoundError(f"template not found or unreadable: {path}")
+        raise FileNotFoundError(f"Template not found or unreadable: {path}")
     return img
 
 def region_from_percent(zone):
@@ -54,15 +58,44 @@ def region_from_percent(zone):
     return (x1, y1, x2 - x1, y2 - y1)
 
 def screenshot_region(region):
-    """take screenshot of region and return cv2 bgr image"""
+    """
+    universal screenshot of region (x, y, w, h)
+    - Windows: mss
+    - Linux X11: mss
+    - Linux Wayland: grim
+    """
     x, y, w, h = region
-    img = pyautogui.screenshot(region=(x, y, w, h))
-    img = img.convert('RGB')
-    arr = np.array(img)
-    return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+
+    if sys.platform.startswith("linux"):
+        if os.environ.get("WAYLAND_DISPLAY"):
+            # Wayland, use grim
+            if not shutil.which("grim"):
+                raise RuntimeError(
+                    "Wayland detected but 'grim' is not installed. "
+                    "Install it via 'sudo apt install grim'."
+                )
+            with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+                path = tmp.name
+                subprocess.run(["grim", path], check=True)
+                img = cv2.imread(path)
+                if img is None:
+                    raise RuntimeError("Failed to read screenshot from grim")
+                return img[y:y+h, x:x+w]
+        else:
+            # Linux X11
+            with mss.mss() as sct:
+                monitor = {"top": y, "left": x, "width": w, "height": h}
+                img = np.array(sct.grab(monitor))
+                return cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2BGR)
+    else:
+        # Windows
+        with mss.mss() as sct:
+            monitor = {"top": y, "left": x, "width": w, "height": h}
+            img = np.array(sct.grab(monitor))
+            return cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2BGR)
 
 def match_template(image, template, threshold):
-    """return center (x,y) of match if found above threshold, else None"""
+    """return center (x,y) of match if above threshold, else None"""
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray_tpl = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     res = cv2.matchTemplate(gray_img, gray_tpl, cv2.TM_CCOEFF_NORMED)
@@ -77,6 +110,7 @@ def match_template(image, template, threshold):
 # ----------------------------- worker -----------------------------
 
 class AutoClicker(threading.Thread):
+    """threaded auto-clicker"""
     def __init__(self, templates, delay, on_update=None):
         super().__init__(daemon=True)
         self.templates = templates
@@ -86,7 +120,7 @@ class AutoClicker(threading.Thread):
         self.on_update = on_update
         self.start_time = None
 
-        # preload template images
+        # preload templates
         for t in self.templates:
             t["image"] = load_template(Path(t["path"]).resolve())
             t["region_abs"] = region_from_percent(t["zone"])
@@ -110,36 +144,38 @@ class AutoClicker(threading.Thread):
     def stop(self):
         self.stop_flag.set()
 
-# ----------------------------- gui -----------------------------
+# ----------------------------- GUI -----------------------------
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Image AutoClicker")
-        self.geometry("420x400")
+        self.geometry("450x450")
         ctk.set_appearance_mode("system")
         ctk.set_default_color_theme("blue")
 
         self.delay_var = ctk.DoubleVar(value=DEFAULT_DELAY)
         self.time_var = ctk.StringVar(value="0.0 s")
         self.count_vars = {t["name"]: ctk.StringVar(value="0") for t in TEMPLATES}
-
-        # for mouse position display
         self.mouse_pos_var = ctk.StringVar(value="x: 0, y: 0 (0.0%, 0.0%)")
 
         self.worker = None
 
         self._build_ui()
-
-        # start mouse position updater
         self.update_mouse_position()
 
+        # global hotkeys
+        self.hotkeys = keyboard.GlobalHotKeys({
+            '<ctrl>+<f1>': self.start_clicker,
+            '<ctrl>+<f2>': self.stop_clicker
+        })
+        self.hotkeys.start()
+        print("[Hotkeys] Start = Ctrl+F1 | Stop = Ctrl+F2")
+
     def _build_ui(self):
-        # delay
         ctk.CTkLabel(self, text="delay between scans (s):").pack(pady=(10,0))
         ctk.CTkEntry(self, textvariable=self.delay_var).pack()
 
-        # click counts
         ctk.CTkLabel(self, text="click counts:").pack(pady=(10,0))
         for name, var in self.count_vars.items():
             frame = ctk.CTkFrame(self)
@@ -147,26 +183,26 @@ class App(ctk.CTk):
             ctk.CTkLabel(frame, text=name).pack(side="left", padx=5)
             ctk.CTkLabel(frame, textvariable=var).pack(side="right", padx=5)
 
-        # elapsed time
         ctk.CTkLabel(self, text="elapsed time:").pack(pady=(10,0))
         ctk.CTkLabel(self, textvariable=self.time_var).pack()
 
-        # buttons
+        ctk.CTkLabel(self, text="cursor position (debug):").pack(pady=(10,0))
+        ctk.CTkLabel(self, textvariable=self.mouse_pos_var).pack()
+
         btn_frame = ctk.CTkFrame(self)
         btn_frame.pack(pady=10)
         ctk.CTkButton(btn_frame, text="Start", command=self.start_clicker).pack(side="left", padx=5)
         ctk.CTkButton(btn_frame, text="Restart", command=self.restart_clicker).pack(side="left", padx=5)
         ctk.CTkButton(btn_frame, text="Stop", command=self.stop_clicker).pack(side="left", padx=5)
 
-        # mouse position debug
-        ctk.CTkLabel(self, text="cursor position (debug):").pack(pady=(10,0))
-        ctk.CTkLabel(self, textvariable=self.mouse_pos_var).pack()
+        ctk.CTkLabel(self, text="Hotkeys: Ctrl+F1 = Start, Ctrl+F2 = Stop").pack(pady=(10,0))
 
     def start_clicker(self):
         if self.worker and self.worker.is_alive():
             return
         self.worker = AutoClicker(TEMPLATES, self.delay_var.get(), on_update=self.update_status)
         self.worker.start()
+        print("> Start button pressed")
 
     def restart_clicker(self):
         self.stop_clicker()
@@ -174,11 +210,13 @@ class App(ctk.CTk):
             var.set("0")
         self.time_var.set("0.0 s")
         self.start_clicker()
+        print("> Restart button pressed")
 
     def stop_clicker(self):
         if self.worker and self.worker.is_alive():
             self.worker.stop()
             self.worker.join()
+            print("> Stop button pressed")
 
     def update_status(self, counts, elapsed):
         for name, count in counts.items():
@@ -186,30 +224,17 @@ class App(ctk.CTk):
         self.time_var.set(f"{elapsed:.1f} s")
 
     def update_mouse_position(self):
-        """update mouse position label every 0.5 sec"""
         x, y = pyautogui.position()
         sw, sh = pyautogui.size()
         px = (x / sw) * 100
-        py = (y / sh) * 100
-        self.mouse_pos_var.set(f"x: {x}, y: {y}  ({px:.1f}%, {py:.1f}%)")
-        self.after(100, self.update_mouse_position)  # update every 0.1s
+        py_ = (y / sh) * 100
+        self.mouse_pos_var.set(f"x: {x}, y: {y}  ({px:.1f}%, {py_:.1f}%)")
+        self.after(500, self.update_mouse_position)
 
     def on_close(self):
         self.stop_clicker()
+        self.hotkeys.stop()
         self.destroy()
-
-    def on_activate_start():
-        app.start_clicker()
-
-    def on_activate_stop():
-        app.stop_clicker()
-
-    # define hotkeys
-    hotkeys = keyboard.GlobalHotKeys({
-        '<ctrl>+<f1>': on_activate_start,
-        '<ctrl>+<f2>': on_activate_stop
-    })
-    hotkeys.start()
 
 # ----------------------------- main -----------------------------
 
