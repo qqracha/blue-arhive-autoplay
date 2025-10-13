@@ -2,11 +2,7 @@ import os
 import sys
 import time
 import threading
-import subprocess
-import tempfile
 from pathlib import Path
-import shutil
-
 import cv2
 import numpy as np
 import pyautogui
@@ -24,32 +20,56 @@ TEMPLATES = [
         "threshold": 0.85
     },
     {
+        "name": "yellow_confirm_button",
+        "path": "templates/confirm2.png",
+        "zone": (0.35, 0.82, 0.62, 0.99),
+        "threshold": 0.85
+    },
+    {
         "name": "watch_button",
         "path": "templates/watch.png",
         "zone": (0.48, 0.65, 0.73, 0.80),
         "threshold": 0.85
     },
-    # {
-    #     "name": "reward_button",
-    #     "path": "templates/reward.png",
-    #     "zone": (0.75, 0.15, 0.90, 0.25),
-    #     "threshold": 0.85
-    # },
+    {
+        "name": "enter_button",
+        "path": "templates/enter.png",
+        "zone": (0.26, 0.70, 0.73, 0.89),
+        "threshold": 0.85
+    },
+    {
+        "name": "mobilize_button",
+        "path": "templates/mobilize.png",
+        "zone": (0.80, 0.80, 0.99, 0.99),
+        "threshold": 0.85
+    }  
 ]
+
+
+# [NEW] automenu detection
+AUTOMENU_TEMPLATE = {
+    "path": "templates/automenu.png",
+    "zone": (0.68, 0.01, 0.99, 0.14),
+    "threshold": 0.85
+}
+
+REWARD_TEMPLATE = {
+        "path": "templates/reward.png",
+        "zone": (0.23, 0.14, 0.72, 0.28),
+        "threshold": 0.85,
+}
 
 DEFAULT_DELAY = 1.0  # seconds
 
 # ----------------------------- utilities -----------------------------
 
 def load_template(path):
-    """load image as cv2 BGR array"""
     img = cv2.imread(str(path))
     if img is None:
         raise FileNotFoundError(f"Template not found or unreadable: {path}")
     return img
 
 def region_from_percent(zone):
-    """convert zone in % to absolute screen region (x, y, w, h)"""
     screen_w, screen_h = pyautogui.size()
     x1 = int(screen_w * zone[0])
     y1 = int(screen_h * zone[1])
@@ -58,44 +78,14 @@ def region_from_percent(zone):
     return (x1, y1, x2 - x1, y2 - y1)
 
 def screenshot_region(region):
-    """
-    universal screenshot of region (x, y, w, h)
-    - Windows: mss
-    - Linux X11: mss
-    - Linux Wayland: grim
-    """
+    """Universal screenshot for X11 and Windows only"""
     x, y, w, h = region
-
-    if sys.platform.startswith("linux"):
-        if os.environ.get("WAYLAND_DISPLAY"):
-            # Wayland, use grim
-            if not shutil.which("grim"):
-                raise RuntimeError(
-                    "Wayland detected but 'grim' is not installed. "
-                    "Install it via 'sudo apt install grim'."
-                )
-            with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
-                path = tmp.name
-                subprocess.run(["grim", path], check=True)
-                img = cv2.imread(path)
-                if img is None:
-                    raise RuntimeError("Failed to read screenshot from grim")
-                return img[y:y+h, x:x+w]
-        else:
-            # Linux X11
-            with mss.mss() as sct:
-                monitor = {"top": y, "left": x, "width": w, "height": h}
-                img = np.array(sct.grab(monitor))
-                return cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2BGR)
-    else:
-        # Windows
-        with mss.mss() as sct:
-            monitor = {"top": y, "left": x, "width": w, "height": h}
-            img = np.array(sct.grab(monitor))
-            return cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2BGR)
+    with mss.mss() as sct:
+        monitor = {"top": y, "left": x, "width": w, "height": h}
+        img = np.array(sct.grab(monitor))
+        return cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2BGR)
 
 def match_template(image, template, threshold):
-    """return center (x,y) of match if above threshold, else None"""
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray_tpl = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     res = cv2.matchTemplate(gray_img, gray_tpl, cv2.TM_CCOEFF_NORMED)
@@ -110,7 +100,6 @@ def match_template(image, template, threshold):
 # ----------------------------- worker -----------------------------
 
 class AutoClicker(threading.Thread):
-    """threaded auto-clicker"""
     def __init__(self, templates, delay, on_update=None):
         super().__init__(daemon=True)
         self.templates = templates
@@ -125,9 +114,42 @@ class AutoClicker(threading.Thread):
             t["image"] = load_template(Path(t["path"]).resolve())
             t["region_abs"] = region_from_percent(t["zone"])
 
+        # [NEW] preload automenu
+        self.automenu_img = load_template(Path(AUTOMENU_TEMPLATE["path"]).resolve())
+        self.automenu_region = region_from_percent(AUTOMENU_TEMPLATE["zone"])
+
+        # [NEW] reward
+        self.reward_img = load_template(Path(REWARD_TEMPLATE["path"]).resolve())
+        self.reward_region = region_from_percent(REWARD_TEMPLATE["zone"])
+
     def run(self):
         self.start_time = time.time()
         while not self.stop_flag.is_set():
+
+            # [NEW] check automenu first
+            automenu_screen = screenshot_region(self.automenu_region)
+            found_menu = match_template(
+                automenu_screen, self.automenu_img, AUTOMENU_TEMPLATE["threshold"]
+            )
+            if found_menu:
+                print("[AutoMenu] Found automenu.png — pressing ESC → wait 2s → ENTER")
+                pyautogui.press("esc")
+                time.sleep(2)
+                pyautogui.press("enter")
+                time.sleep(self.delay)
+                continue
+            
+            # [NEW] check reward
+            reward_screen = screenshot_region(self.reward_region)
+            found_reward = match_template(
+                reward_screen, self.reward_img, REWARD_TEMPLATE["threshold"]
+            )
+            if found_reward:
+                print("[Reward] Found reward.png — pressing ENTER")
+                pyautogui.press("enter")
+                time.sleep(self.delay)
+                continue
+            # normal templates loop
             for t in self.templates:
                 region = t["region_abs"]
                 screenshot = screenshot_region(region)
@@ -164,7 +186,6 @@ class App(ctk.CTk):
         self._build_ui()
         self.update_mouse_position()
 
-        # global hotkeys
         self.hotkeys = keyboard.GlobalHotKeys({
             '<ctrl>+<f1>': self.start_clicker,
             '<ctrl>+<f2>': self.stop_clicker
