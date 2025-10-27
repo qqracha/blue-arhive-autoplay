@@ -27,37 +27,37 @@ TEMPLATES = [
         "name": "confirm_button",
         "path": "templates/confirm.png",
         "zone": (0.77, 0.84, 0.99, 0.99),
-        "threshold": 0.85
+        "threshold": 0.65
     },
     {
         "name": "yellow_confirm_button",
         "path": "templates/confirm2.png",
         "zone": (0.35, 0.82, 0.62, 0.99),
-        "threshold": 0.85
+        "threshold": 0.65
     },
     {
         "name": "watch_button",
         "path": "templates/watch.png",
         "zone": (0.48, 0.65, 0.73, 0.80),
-        "threshold": 0.85
+        "threshold": 0.65
     },
     {
         "name": "enter_button",
         "path": "templates/enter.png",
         "zone": (0.26, 0.70, 0.73, 0.89),
-        "threshold": 0.85
+        "threshold": 0.65
     },
     {
         "name": "mobilize_button",
         "path": "templates/mobilize.png",
         "zone": (0.80, 0.80, 0.99, 0.99),
-        "threshold": 0.85
+        "threshold": 0.65
     },
     {
         "name": "enter_episode",
         "path": "templates/enter_episode.png",
         "zone": (0.36, 0.63, 0.63, 0.78),
-        "threshold": 0.85
+        "threshold": 0.65
     }    
 ]
 
@@ -67,14 +67,14 @@ AUTOMENU_TEMPLATE = {
     "name": "automenu",
     "path": "templates/automenu.png",
     "zone": (0.68, 0.01, 0.99, 0.14),
-    "threshold": 0.85
+    "threshold": 0.65
 }
 
 REWARD_TEMPLATE = {
         "name": "reward",
         "path": "templates/reward.png",
         "zone": (0.23, 0.14, 0.72, 0.28),
-        "threshold": 0.85,
+        "threshold": 0.65,
 }
 
 DEFAULT_DELAY = 1.0  # seconds
